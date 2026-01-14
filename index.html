@@ -1,0 +1,1359 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>INITIAL DRIFT - LEGEND OF THE STREET</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;900&display=swap');
+
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background-color: #87ceeb; 
+            font-family: 'Orbitron', sans-serif; 
+        }
+
+        .arcade-text {
+            color: #fff;
+            text-shadow: 0 0 10px #ff3300, 0 0 20px #ff3300;
+            letter-spacing: 2px;
+        }
+
+        .menu-item {
+            padding: 10px 30px;
+            margin: 0 10px;
+            border: 2px solid transparent;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            font-weight: bold;
+            color: #ddd;
+            background: rgba(0,0,0,0.5);
+            cursor: pointer;
+        }
+
+        .menu-item.selected {
+            border-color: #ffcc00;
+            color: #fff;
+            box-shadow: 0 0 15px #ffcc00;
+            transform: scale(1.1);
+            background: rgba(0,0,0,0.8);
+        }
+
+        .settings-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            width: 400px;
+            padding: 15px;
+            margin: 5px 0;
+            background: rgba(255,255,255,0.05);
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .settings-row.selected {
+            background: rgba(255, 204, 0, 0.2);
+            border: 1px solid #ffcc00;
+            transform: translateX(10px);
+        }
+
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            color: white;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .stats-box {
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-left: 5px solid #ffcc00;
+            clip-path: polygon(0 0, 100% 0, 95% 100%, 0 100%);
+        }
+
+        .speedometer {
+            font-size: 3.5rem;
+            font-weight: 900;
+            color: #ffffff;
+            text-shadow: 0 0 10px #000;
+        }
+
+        #start-screen, #finish-screen, #settings-screen, #demo-screen {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+
+        #demo-screen {
+            display: none;
+        }
+
+        #demo-text {
+            font-size: 4rem;
+            font-weight: 900;
+            color: #ffcc00;
+            text-shadow: 0 0 20px #ff3300;
+            margin-bottom: 2rem;
+        }
+
+        #countdown-layer {
+            position: absolute;
+            inset: 0;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 50;
+            pointer-events: none;
+        }
+
+        #countdown-text {
+            font-size: 12rem;
+            font-weight: 900;
+            color: #fff;
+            text-shadow: 0 0 30px #ffcc00;
+            font-style: italic;
+        }
+
+        .scanline {
+            width: 100%;
+            height: 100%;
+            z-index: 200;
+            background: linear-gradient(0deg, rgba(0,0,0,0) 50%, rgba(255,255,255,0.02) 50%);
+            background-size: 100% 4px;
+            position: absolute;
+            pointer-events: none;
+        }
+
+        .time-warning {
+            color: #ff3c00;
+            animation: blink 0.5s infinite;
+        }
+
+        #controller-status {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            color: #88ff88;
+            font-size: 1.1rem;
+            text-shadow: 0 0 8px #00ff00;
+            background: rgba(0,0,0,0.5);
+            padding: 8px 16px;
+            border-radius: 8px;
+            border: 1px solid #44aa44;
+            font-weight: bold;
+            z-index: 110;
+            pointer-events: none;
+        }
+
+        #checkpoint-announce {
+            transition: opacity 0.8s;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        @keyframes fadeInOut {
+            0%   { opacity: 0; transform: translateY(-20px); }
+            15%  { opacity: 1; transform: translateY(0); }
+            85%  { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-30px); }
+        }
+    </style>
+</head>
+<body>
+    <div class="scanline"></div>
+
+    <div id="controller-status" style="display: none;">
+        CONTROLLER: NONE
+    </div>
+
+    <div id="start-screen">
+        <h1 class="text-7xl font-black italic arcade-text mb-2 text-center uppercase tracking-tighter">
+            INITIAL DRIFT
+        </h1>
+        <h2 class="text-2xl font-light tracking-[0.5em] text-white mb-16 text-center shadow-sm">
+            LEGEND OF THE STREET
+        </h2>
+        
+        <div id="start-menu" class="flex items-center mb-12">
+            <div class="menu-item selected" data-action="start">START GAME</div>
+            <div class="menu-item" data-action="settings">SETTINGS</div>
+        </div>
+
+        <p class="text-yellow-400 text-sm animate-pulse font-bold tracking-widest">
+            PRESS ENTER OR START
+        </p>
+    </div>
+
+    <div id="demo-screen">
+        <div id="demo-text" class="arcade-text">DEMO PLAY</div>
+        <p class="text-yellow-400 text-xl animate-pulse font-bold tracking-widest">
+            PRESS ENTER OR START
+        </p>
+    </div>
+
+    <div id="settings-screen" style="display: none;">
+        <h2 class="text-4xl font-black text-white mb-8 arcade-text">SETTINGS</h2>
+        
+        <div id="settings-list" class="mb-6">
+            <div class="settings-row selected" data-setting="time">
+                <span class="text-gray-400">TIME LIMIT</span>
+                <span id="setting-time-val" class="text-[#ffcc00] font-bold">60s</span>
+            </div>
+            <div class="settings-row" data-setting="rival">
+                <span class="text-gray-400">RIVAL LEVEL</span>
+                <span id="setting-rival-val" class="text-[#ffcc00] font-bold">NORMAL</span>
+            </div>
+            <div class="settings-row" data-setting="graphics">
+                <span class="text-gray-400">GRAPHICS</span>
+                <span id="setting-graphics-val" class="text-[#ffcc00] font-bold">HIGH</span>
+            </div>
+            <div class="settings-row" data-setting="exit">
+                <span class="text-white font-bold">EXIT</span>
+                <span class="text-gray-400 text-[10px] uppercase">Return to Title</span>
+            </div>
+        </div>
+
+        <p class="text-gray-400 text-[10px] mt-4 uppercase tracking-widest">
+            [UP/DOWN] NAVIGATE • [LEFT/RIGHT] CHANGE • [ENTER / A] SELECT
+        </p>
+    </div>
+
+    <div id="countdown-layer">
+        <div id="countdown-text">3</div>
+    </div>
+
+    <div id="checkpoint-announce" class="absolute top-[18%] left-0 right-0 flex justify-center pointer-events-none hidden z-40">
+        <div class="text-5xl font-black text-[#ffcc00] arcade-text tracking-wider opacity-90 shadow-lg animate-[fadeInOut_2.2s_ease-in-out_forwards]">
+            CHECK POINT
+        </div>
+    </div>
+
+    <div id="finish-screen" style="display: none;">
+        <h2 class="text-6xl font-black text-white mb-4 arcade-text">FINISH!</h2>
+        <div class="bg-black/80 p-8 border-y-2 border-[#ffcc00] mb-8 w-full text-center">
+            <p id="final-laps" class="text-3xl text-white mb-2">SCORE: 0.00 LAPS</p>
+            <p id="final-rank" class="text-xl text-[#ffcc00]">POSITION: --</p>
+        </div>
+        
+        <div id="finish-menu" class="flex items-center">
+            <div class="menu-item selected" data-action="retry">RETRY</div>
+            <div class="menu-item" data-action="quit">TITLE</div>
+        </div>
+    </div>
+
+    <div id="ui-layer" style="display: none;">
+        <div class="flex justify-between items-start">
+            <div class="stats-box px-10">
+                <div class="text-[10px] uppercase text-[#ffcc00]">Position</div>
+                <div id="rank" class="text-4xl font-black italic">1st / 2</div>
+                <div id="lap-display" class="text-xs text-gray-300">LAP 1</div>
+            </div>
+            <div class="stats-box px-10 text-right">
+                <div class="text-[10px] uppercase text-[#ffcc00]">Time Limit</div>
+                <div id="timer" class="text-4xl font-black italic">60.00</div>
+            </div>
+        </div>
+
+        <div class="flex justify-center mb-12">
+            <div class="stats-box px-16 text-center transform scale-110 border-none bg-black/40">
+                <div class="speedometer" id="speed-display">0</div>
+                <div class="text-[10px] uppercase text-white tracking-widest">KM/H</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let scene, camera, renderer, clock;
+        let playerCar, rivalCar;
+        let roadPoints = [];
+        let gameActive = false;
+        let countdownActive = false;
+        let demoActive = false;
+        let screenActive = 'start';
+        let menuIndex = 0;
+        let settingsIndex = 0;
+        let timeLeft = 60;
+        let speed = 0;
+        let rotation = 0;
+        let playerProgress = 0; 
+        let playerTotalProgress = 0; 
+        let rivalTotalProgress = 0;
+        let curve; 
+
+        let lastCheckpointLap = -1;
+        let checkpointAnnounceTimer = null;
+
+        let demoPlayerProgress = 0;
+        let demoRivalProgress = 0;
+        let demoPlayerSpeed = 0;
+        let demoRivalSpeed = 0;
+        let demoPlayerLane = 6;
+        let demoRivalLane = -6;
+
+        let lastCollisionTime = 0;
+        const COLLISION_COOLDOWN = 0.7;
+        const CAR_COLLISION_RADIUS = 4.5;
+        let shakeAmount = 0;
+
+        let rivalTargetLane = -6.0;
+        let rivalCurrentLaneOffset = -6.0;
+        let rivalSpeed = 0;
+        let rivalTargetSpeed = 0;
+
+        let idleTimeout;
+        const IDLE_TIME = 15000;
+
+        let audioCtx;
+        let engineOsc;
+        let engineGain;
+        let bgmAudio = null;
+        let finishBgmAudio = null;
+        const bgmBaseUrl = 'https://user-b4h.github.io/initial-drift/bgm/';
+        let lastBgmNumber = 0;
+
+        let gamepads = {};
+        let prevGamepadButtons = {};
+
+        const controllerStatusEl = document.getElementById('controller-status');
+
+        function updateControllerStatus() {
+            if (screenActive !== 'start') {
+                controllerStatusEl.style.display = 'none';
+                return;
+            }
+
+            const connected = navigator.getGamepads ? navigator.getGamepads() : [];
+            let count = 0;
+            let names = [];
+
+            for (let i = 0; i < connected.length; i++) {
+                if (connected[i]) {
+                    count++;
+                    const name = connected[i].id.split('(')[0].trim() || `Gamepad ${i+1}`;
+                    names.push(name);
+                }
+            }
+
+            if (count === 0) {
+                controllerStatusEl.innerHTML = 'CONTROLLER: <span style="color:#ff8888;">NONE</span>';
+            } else if (count === 1) {
+                controllerStatusEl.innerHTML = `CONTROLLER: <span style="color:#88ff88;">CONNECTED</span><br><small>${names[0]}</small>`;
+            } else {
+                controllerStatusEl.innerHTML = `CONTROLLERS: <span style="color:#88ff88;">${count} CONNECTED</span><br><small>${names.join(', ')}</small>`;
+            }
+
+            controllerStatusEl.style.display = 'block';
+        }
+
+        function initAudio() {
+            if (audioCtx) return;
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            
+            engineOsc = audioCtx.createOscillator();
+            engineGain = audioCtx.createGain();
+            engineOsc.type = 'sawtooth';
+            engineOsc.frequency.setValueAtTime(40, audioCtx.currentTime);
+            engineGain.gain.setValueAtTime(0, audioCtx.currentTime);
+            
+            const lowpass = audioCtx.createBiquadFilter();
+            lowpass.type = 'lowpass';
+            lowpass.frequency.setValueAtTime(400, audioCtx.currentTime);
+
+            engineOsc.connect(lowpass);
+            lowpass.connect(engineGain);
+            engineGain.connect(audioCtx.destination);
+            engineOsc.start();
+        }
+
+        function playSound(freq, duration, type = 'sine', volume = 0.1) {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const g = audioCtx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            g.gain.setValueAtTime(volume, audioCtx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+            osc.connect(g);
+            g.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        }
+
+        function playCollisionSound() {
+            playSound(110, 0.14, 'square', 0.28);
+            setTimeout(() => playSound(75, 0.22, 'square', 0.20), 40);
+        }
+
+        function playSelectSound() {
+            playSound(440, 0.05, 'square', 0.05);
+        }
+
+        function playConfirmSound() {
+            playSound(880, 0.1, 'sine', 0.1);
+            setTimeout(() => playSound(1320, 0.15, 'sine', 0.1), 50);
+        }
+
+        function playCheckpointSound() {
+            playSound(660, 0.08, 'square', 0.12);
+            setTimeout(() => playSound(880, 0.12, 'square', 0.15), 60);
+            setTimeout(() => playSound(1100, 0.15, 'square', 0.18), 140);
+        }
+
+        function getRandomBgmNumber() {
+            let num;
+            do {
+                num = Math.floor(Math.random() * 22) + 1;
+            } while (num === lastBgmNumber && 22 > 1);
+            lastBgmNumber = num;
+            return num;
+        }
+
+        function playBGM() {
+            if (bgmAudio) {
+                bgmAudio.pause();
+                bgmAudio.currentTime = 0;
+                bgmAudio.removeEventListener('ended', onBgmEnded);
+            }
+
+            const randomNum = getRandomBgmNumber();
+            const bgmUrl = `${bgmBaseUrl}${randomNum}.mp3`;
+
+            bgmAudio = new Audio(bgmUrl);
+            bgmAudio.loop = false;
+            bgmAudio.volume = 0.15;
+
+            bgmAudio.addEventListener('ended', onBgmEnded);
+
+            bgmAudio.play().catch(e => {
+                console.log('BGM autoplay prevented:', e);
+            });
+        }
+
+        function playFinishBGM() {
+            if (finishBgmAudio) {
+                finishBgmAudio.pause();
+                finishBgmAudio.currentTime = 0;
+            }
+
+            finishBgmAudio = new Audio('https://user-b4h.github.io/initial-drift/bgm/finish.mp3');
+            finishBgmAudio.loop = true;
+            finishBgmAudio.volume = 0.15;
+            finishBgmAudio.play().catch(e => {
+                console.log('Finish BGM autoplay prevented:', e);
+            });
+        }
+
+        function stopFinishBGM() {
+            if (finishBgmAudio) {
+                finishBgmAudio.pause();
+                finishBgmAudio.currentTime = 0;
+                finishBgmAudio = null;
+            }
+        }
+
+        function onBgmEnded() {
+            playBGM();
+        }
+
+        function stopBGM() {
+            if (bgmAudio) {
+                bgmAudio.pause();
+                bgmAudio.currentTime = 0;
+                bgmAudio.removeEventListener('ended', onBgmEnded);
+                bgmAudio = null;
+            }
+        }
+
+        const config = {
+            duration: 60,
+            rivalDifficulty: 1.0, 
+            graphics: 'high'
+        };
+        
+        const TRACK_WIDTH = 24;
+        const RIVAL_LANE_OFFSET = -6.0;
+
+        const keys = { 
+            w: false, a: false, s: false, d: false, 
+            ArrowUp: false, ArrowLeft: false, ArrowDown: false, ArrowRight: false 
+        };
+
+        function resetIdleTimer() {
+            clearTimeout(idleTimeout);
+            if (screenActive === 'start') {
+                idleTimeout = setTimeout(startDemo, IDLE_TIME);
+            }
+        }
+
+        function startDemo() {
+            if (screenActive !== 'start') return;
+            screenActive = 'demo';
+            demoActive = true;
+            document.getElementById('start-screen').style.display = 'none';
+            document.getElementById('demo-screen').style.display = 'flex';
+            document.getElementById('ui-layer').style.display = 'none';
+
+            stopFinishBGM();
+            updateControllerStatus();
+
+            const startPoint = roadPoints[0];
+            const startTangent = curve.getTangentAt(0);
+            const startAngle = Math.atan2(startTangent.x, startTangent.z);
+
+            playerCar.position.copy(startPoint).add(new THREE.Vector3(6, 0.1, 0));
+            playerCar.rotation.y = startAngle;
+
+            rivalCar.position.copy(startPoint).add(new THREE.Vector3(-6, 0.1, 0));
+            rivalCar.rotation.y = startAngle;
+
+            demoPlayerProgress = 0.02; 
+            demoRivalProgress = 0;
+            demoPlayerSpeed = 100;
+            demoRivalSpeed = 100;
+            demoPlayerLane = 6;
+            demoRivalLane = -6;
+
+            playBGM();
+        }
+
+        function stopDemo() {
+            demoActive = false;
+            stopBGM();
+            stopFinishBGM();
+            document.getElementById('demo-screen').style.display = 'none';
+            document.getElementById('start-screen').style.display = 'flex';
+            document.getElementById('ui-layer').style.display = 'none';
+            screenActive = 'start';
+            updateControllerStatus();
+            resetIdleTimer();
+        }
+
+        window.addEventListener('gamepadconnected', (e) => {
+            console.log("Gamepad connected:", e.gamepad.index);
+            gamepads[e.gamepad.index] = e.gamepad;
+            updateControllerStatus();
+        });
+
+        window.addEventListener('gamepaddisconnected', (e) => {
+            console.log("Gamepad disconnected:", e.gamepad.index);
+            delete gamepads[e.gamepad.index];
+            updateControllerStatus();
+        });
+
+        function updateGamepadInput() {
+            const gamepadsArray = navigator.getGamepads ? navigator.getGamepads() : [];
+            
+            for (let i = 0; i < gamepadsArray.length; i++) {
+                const gp = gamepadsArray[i];
+                if (!gp) continue;
+
+                const prev = prevGamepadButtons[i] || {};
+
+                const accelAxis = Math.max(0, gp.axes[5] || 0);
+                const accelButton = gp.buttons[7]?.value || 0;
+                const accelValue = Math.max(accelAxis, accelButton);
+
+                const brakeAxis = Math.max(0, -gp.axes[4] || 0);
+                const brakeButton = gp.buttons[6]?.value || 0;
+                const brakeValue = Math.max(brakeAxis, brakeButton);
+
+                if (gameActive) {
+                    if (accelValue > 0.08) {
+                        keys.w = true;
+                        keys.s = false;
+                    } else if (brakeValue > 0.08) {
+                        keys.s = true;
+                        keys.w = false;
+                    } else {
+                        keys.w = false;
+                        keys.s = false;
+                    }
+
+                    const leftStickX = gp.axes[0];
+                    if (Math.abs(leftStickX) > 0.15) {
+                        if (leftStickX < -0.15) {
+                            keys.a = true;
+                            keys.d = false;
+                        } else if (leftStickX > 0.15) {
+                            keys.d = true;
+                            keys.a = false;
+                        }
+                    } else {
+                        keys.a = false;
+                        keys.d = false;
+                    }
+                }
+
+                const dpadUp   = gp.buttons[12]?.pressed;
+                const dpadDown = gp.buttons[13]?.pressed;
+                const dpadLeft = gp.buttons[14]?.pressed;
+                const dpadRight = gp.buttons[15]?.pressed;
+                const confirm  = gp.buttons[0]?.pressed || gp.buttons[9]?.pressed;
+
+                if (screenActive === 'start' || screenActive === 'finish') {
+                    const menuId = screenActive === 'start' ? 'start-menu' : 'finish-menu';
+                    const items = document.querySelectorAll(`#${menuId} .menu-item`);
+
+                    if (dpadRight && !prev.dpadRight) {
+                        menuIndex = (menuIndex + 1) % items.length;
+                        playSelectSound();
+                        updateMenuSelection(items);
+                    }
+                    if (dpadLeft && !prev.dpadLeft) {
+                        menuIndex = (menuIndex - 1 + items.length) % items.length;
+                        playSelectSound();
+                        updateMenuSelection(items);
+                    }
+                    if (confirm && !prev.confirm) {
+                        playConfirmSound();
+                        const action = items[menuIndex].getAttribute('data-action');
+                        handleMenuAction(action);
+                    }
+                }
+
+                else if (screenActive === 'settings') {
+                    const rows = document.querySelectorAll('.settings-row');
+
+                    if (dpadDown && !prev.dpadDown) {
+                        settingsIndex = (settingsIndex + 1) % rows.length;
+                        playSelectSound();
+                        updateSettingsVisuals();
+                    }
+                    if (dpadUp && !prev.dpadUp) {
+                        settingsIndex = (settingsIndex - 1 + rows.length) % rows.length;
+                        playSelectSound();
+                        updateSettingsVisuals();
+                    }
+
+                    if ((dpadRight && !prev.dpadRight) || (dpadLeft && !prev.dpadLeft)) {
+                        const step = dpadRight ? 1 : -1;
+                        const setting = rows[settingsIndex].getAttribute('data-setting');
+                        
+                        if (setting !== 'exit') {
+                            playSelectSound();
+                            if (setting === 'time') {
+                                config.duration = Math.max(30, Math.min(180, config.duration + (step * 30)));
+                                document.getElementById('setting-time-val').innerText = config.duration + 's';
+                            } else if (setting === 'rival') {
+                                const levels = [0.8, 1.0, 1.3];
+                                const labels = ["EASY", "NORMAL", "HARD"];
+                                let currIdx = levels.indexOf(config.rivalDifficulty);
+                                currIdx = (currIdx + step + levels.length) % levels.length;
+                                config.rivalDifficulty = levels[currIdx];
+                                document.getElementById('setting-rival-val').innerText = labels[currIdx];
+                            } else if (setting === 'graphics') {
+                                config.graphics = config.graphics === 'high' ? 'low' : 'high';
+                                document.getElementById('setting-graphics-val').innerText = config.graphics.toUpperCase();
+                                updateGraphicsSetting();
+                            }
+                        }
+                    }
+
+                    if (confirm && !prev.confirm) {
+                        const setting = rows[settingsIndex].getAttribute('data-setting');
+                        if (setting === 'exit') {
+                            playConfirmSound();
+                            handleMenuAction('back');
+                        }
+                    }
+                }
+
+                if (demoActive && (accelValue > 0.1 || brakeValue > 0.1 || Math.abs(gp.axes[0]) > 0.2 || confirm)) {
+                    stopDemo();
+                }
+
+                prevGamepadButtons[i] = {
+                    dpadUp, dpadDown, dpadLeft, dpadRight, confirm
+                };
+            }
+        }
+
+        window.addEventListener('keydown', e => {
+            if (!audioCtx) initAudio();
+            if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+
+            resetIdleTimer();
+
+            if (demoActive) {
+                stopDemo();
+                return;
+            }
+
+            if (!e.repeat) {
+                keys[e.key] = true;
+
+                if (screenActive === 'start' || screenActive === 'finish') {
+                    const menuId = screenActive === 'start' ? 'start-menu' : 'finish-menu';
+                    const items = document.querySelectorAll(`#${menuId} .menu-item`);
+                    
+                    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+                        menuIndex = (menuIndex + (e.key === 'ArrowRight' ? 1 : -1) + items.length) % items.length;
+                        playSelectSound();
+                        updateMenuSelection(items);
+                    } else if (e.key === 'Enter') {
+                        playConfirmSound();
+                        const action = items[menuIndex].getAttribute('data-action');
+                        handleMenuAction(action);
+                    }
+                } else if (screenActive === 'settings') {
+                    handleSettingsInput(e.key);
+                }
+            }
+        });
+
+        window.addEventListener('keyup', e => keys[e.key] = false);
+        window.addEventListener('mousemove', resetIdleTimer);
+        window.addEventListener('click', resetIdleTimer);
+
+        function updateMenuSelection(items) {
+            items.forEach((item, idx) => {
+                if (idx === menuIndex) item.classList.add('selected');
+                else item.classList.remove('selected');
+            });
+        }
+
+        function handleMenuAction(action) {
+            if (action === 'retry' || action === 'quit' || action === 'back') {
+                stopFinishBGM();
+            }
+
+            if (action === 'start' || action === 'retry') {
+                startCountdownSequence();
+            } else if (action === 'settings') {
+                screenActive = 'settings';
+                settingsIndex = 0;
+                document.getElementById('start-screen').style.display = 'none';
+                document.getElementById('settings-screen').style.display = 'flex';
+                updateSettingsVisuals();
+                updateControllerStatus();
+            } else if (action === 'quit' || action === 'back') {
+                screenActive = 'start';
+                menuIndex = 0;
+                stopBGM();
+                stopFinishBGM();
+                document.getElementById('settings-screen').style.display = 'none';
+                document.getElementById('finish-screen').style.display = 'none';
+                document.getElementById('start-screen').style.display = 'flex';
+                updateMenuSelection(document.querySelectorAll('#start-menu .menu-item'));
+                updateControllerStatus();
+                resetIdleTimer();
+            }
+        }
+
+        function updateSettingsVisuals() {
+            const rows = document.querySelectorAll('.settings-row');
+            rows.forEach((row, idx) => {
+                if (idx === settingsIndex) row.classList.add('selected');
+                else row.classList.remove('selected');
+            });
+        }
+
+        function handleSettingsInput(key) {
+            const rows = document.querySelectorAll('.settings-row');
+            
+            if (key === 'ArrowDown') {
+                settingsIndex = (settingsIndex + 1) % rows.length;
+                playSelectSound();
+                updateSettingsVisuals();
+            } else if (key === 'ArrowUp') {
+                settingsIndex = (settingsIndex - 1 + rows.length) % rows.length;
+                playSelectSound();
+                updateSettingsVisuals();
+            } else if (key === 'ArrowRight' || key === 'ArrowLeft') {
+                const step = key === 'ArrowRight' ? 1 : -1;
+                const setting = rows[settingsIndex].getAttribute('data-setting');
+                
+                if (setting === 'exit') return;
+
+                playSelectSound();
+                if (setting === 'time') {
+                    config.duration = Math.max(30, Math.min(180, config.duration + (step * 30)));
+                    document.getElementById('setting-time-val').innerText = config.duration + 's';
+                } else if (setting === 'rival') {
+                    const levels = [0.8, 1.0, 1.3];
+                    const labels = ["EASY", "NORMAL", "HARD"];
+                    let currIdx = levels.indexOf(config.rivalDifficulty);
+                    currIdx = (currIdx + step + levels.length) % levels.length;
+                    config.rivalDifficulty = levels[currIdx];
+                    document.getElementById('setting-rival-val').innerText = labels[currIdx];
+                } else if (setting === 'graphics') {
+                    config.graphics = config.graphics === 'high' ? 'low' : 'high';
+                    document.getElementById('setting-graphics-val').innerText = config.graphics.toUpperCase();
+                    updateGraphicsSetting();
+                }
+            } else if (key === 'Enter') {
+                const setting = rows[settingsIndex].getAttribute('data-setting');
+                if (setting === 'exit') {
+                    playConfirmSound();
+                    handleMenuAction('back');
+                }
+            }
+        }
+
+        function updateGraphicsSetting() {
+            if (!renderer) return;
+            if (config.graphics === 'low') {
+                renderer.shadowMap.enabled = false;
+                scene.fog.far = 600;
+            } else {
+                renderer.shadowMap.enabled = true;
+                scene.fog.far = 1000;
+            }
+        }
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87ceeb); 
+            scene.fog = new THREE.Fog(0x87ceeb, 200, 1000);
+
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 3000);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            document.body.appendChild(renderer.domElement);
+
+            clock = new THREE.Clock();
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+            scene.add(ambientLight);
+
+            const sunLight = new THREE.DirectionalLight(0xffffff, 1.0);
+            sunLight.position.set(200, 400, 100);
+            sunLight.castShadow = true;
+            scene.add(sunLight);
+
+            createTrack();
+            playerCar = createCar(0xff3300); 
+            rivalCar = createCar(0x0066ff);  
+            scene.add(playerCar);
+            scene.add(rivalCar);
+
+            const groundGeo = new THREE.PlaneGeometry(10000, 10000);
+            const groundMat = new THREE.MeshPhongMaterial({ color: 0x3d6e35 });
+            const ground = new THREE.Mesh(groundGeo, groundMat);
+            ground.rotation.x = -Math.PI / 2;
+            ground.position.y = -0.15;
+            ground.receiveShadow = true;
+            scene.add(ground);
+
+            animate();
+            resetIdleTimer();
+            updateControllerStatus();
+        }
+
+        function createCar(color) {
+            const carGroup = new THREE.Group();
+
+            const body = new THREE.Mesh(
+                new THREE.BoxGeometry(2.9 * 1.4, 1.15 * 1.4, 5.8 * 1.4),
+                new THREE.MeshPhongMaterial({ color: color })
+            );
+            body.position.y = 0.85 * 1.4;
+            body.castShadow = true;
+            carGroup.add(body);
+
+            const top = new THREE.Mesh(
+                new THREE.BoxGeometry(2.1 * 1.4, 0.85 * 1.4, 3.0 * 1.4),
+                new THREE.MeshPhongMaterial({ color: 0x111111 })
+            );
+            top.position.y = 1.8 * 1.4;
+            top.position.z = -0.3 * 1.4;
+            carGroup.add(top);
+
+            const wheelGeo = new THREE.CylinderGeometry(0.75 * 1.45, 0.75 * 1.45, 0.9 * 1.4, 24);
+            const wheelMat = new THREE.MeshPhongMaterial({ color: 0x222222 });
+            
+            const wheelPos = [
+                [-1.55 * 1.4, 0.75 * 1.4,  2.1 * 1.4],
+                [ 1.55 * 1.4, 0.75 * 1.4,  2.1 * 1.4],
+                [-1.55 * 1.4, 0.75 * 1.4, -2.1 * 1.4],
+                [ 1.55 * 1.4, 0.75 * 1.4, -2.1 * 1.4]
+            ];
+
+            wheelPos.forEach(pos => {
+                const wheel = new THREE.Mesh(wheelGeo, wheelMat);
+                wheel.rotation.z = Math.PI / 2;
+                wheel.position.set(...pos);
+                carGroup.add(wheel);
+            });
+
+            return carGroup;
+        }
+
+        function createTrack() {
+            const points = [];
+            const segments = 150;
+            const rx = 400, rz = 600;
+
+            for (let i = 0; i <= segments; i++) {
+                const t = (i / segments) * Math.PI * 2;
+                const x = Math.cos(t) * rx + Math.sin(t * 3) * 60;
+                const z = Math.sin(t) * rz + Math.cos(t * 2) * 40;
+                points.push(new THREE.Vector3(x, 0, z));
+            }
+
+            curve = new THREE.CatmullRomCurve3(points, true);
+            roadPoints = curve.getPoints(1500);
+
+            const roadGeo = new THREE.BufferGeometry();
+            const markingGeo = new THREE.BufferGeometry();
+            
+            const roadVertices = [];
+            const roadIndices = [];
+            const markingVertices = [];
+            const markingIndices = [];
+
+            const SUBDIVISIONS = 1500;
+            for (let i = 0; i <= SUBDIVISIONS; i++) {
+                const t = i / SUBDIVISIONS;
+                const pos = curve.getPointAt(t);
+                const tangent = curve.getTangentAt(t);
+                const normal = new THREE.Vector3(0, 1, 0);
+                const side = new THREE.Vector3().crossVectors(tangent, normal).normalize();
+
+                const pL = pos.clone().add(side.clone().multiplyScalar(TRACK_WIDTH/2));
+                const pR = pos.clone().add(side.clone().multiplyScalar(-TRACK_WIDTH/2));
+                roadVertices.push(pL.x, 0.05, pL.z, pR.x, 0.05, pR.z);
+
+                const yOff = 0.08;
+                const edgeOffset = TRACK_WIDTH/2 - 1.0;
+                const lLineL = pos.clone().add(side.clone().multiplyScalar(edgeOffset));
+                const lLineR = pos.clone().add(side.clone().multiplyScalar(edgeOffset + 0.4));
+                const rLineL = pos.clone().add(side.clone().multiplyScalar(-edgeOffset - 0.4));
+                const rLineR = pos.clone().add(side.clone().multiplyScalar(-edgeOffset));
+                
+                const centerVisible = Math.sin(t * 500) > 0;
+                const cLineL = pos.clone().add(side.clone().multiplyScalar(-0.15));
+                const centerSideR = pos.clone().add(side.clone().multiplyScalar(0.15));
+
+                markingVertices.push(lLineL.x, yOff, lLineL.z, lLineR.x, yOff, lLineR.z);
+                markingVertices.push(rLineL.x, yOff, rLineL.z, rLineR.x, yOff, rLineR.z);
+                
+                if (centerVisible) {
+                    markingVertices.push(cLineL.x, yOff, cLineL.z, centerSideR.x, yOff, centerSideR.z);
+                } else {
+                    markingVertices.push(pos.x, -1, pos.z, pos.x, -1, pos.z);
+                }
+
+                if (i < SUBDIVISIONS) {
+                    const r0 = i * 2;
+                    const r1 = i * 2 + 1;
+                    const r2 = (i + 1) * 2;
+                    const r3 = (i + 1) * 2 + 1;
+                    roadIndices.push(r0, r1, r2, r1, r3, r2);
+
+                    const mBase = i * 6;
+                    const nBase = (i + 1) * 6;
+                    markingIndices.push(mBase, mBase+1, nBase, mBase+1, nBase+1, nBase);
+                    markingIndices.push(mBase+2, mBase+3, nBase+2, mBase+3, nBase+3, nBase+2);
+                    markingIndices.push(mBase+4, mBase+5, nBase+4, mBase+5, nBase+5, nBase+4);
+                }
+            }
+
+            roadGeo.setAttribute('position', new THREE.Float32BufferAttribute(roadVertices, 3));
+            roadGeo.setIndex(roadIndices);
+            roadGeo.computeVertexNormals();
+            
+            const roadMat = new THREE.MeshPhongMaterial({ color: 0x222222, side: THREE.DoubleSide });
+            const roadMesh = new THREE.Mesh(roadGeo, roadMat);
+            roadMesh.receiveShadow = true;
+            scene.add(roadMesh);
+
+            markingGeo.setAttribute('position', new THREE.Float32BufferAttribute(markingVertices, 3));
+            markingGeo.setIndex(markingIndices);
+            const markingMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+            const markingMesh = new THREE.Mesh(markingGeo, markingMat);
+            scene.add(markingMesh);
+
+            const startPos = roadPoints[0];
+            const tangent = curve.getTangentAt(0);
+            const side = new THREE.Vector3().crossVectors(tangent, new THREE.Vector3(0,1,0)).normalize();
+
+            const lineWidth = TRACK_WIDTH * 1.12;
+            const cpGeometry = new THREE.PlaneGeometry(lineWidth, 0.5);
+            const cpMaterial = new THREE.MeshBasicMaterial({
+                color: 0xff0000,
+                side: THREE.DoubleSide,
+                transparent: true,
+                opacity: 0.9
+            });
+
+            const checkpointLine = new THREE.Mesh(cpGeometry, cpMaterial);
+            checkpointLine.position.copy(startPos);
+            checkpointLine.position.y = 0.12;
+            checkpointLine.rotation.x = -Math.PI / 2;
+
+            const startAngle = Math.atan2(tangent.x, tangent.z);
+            checkpointLine.rotation.z = startAngle;
+
+            scene.add(checkpointLine);
+
+            for(let i=0; i<500; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const dist = 75 + Math.random() * 400;
+                const tx = Math.cos(angle) * (500 + dist);
+                const tz = Math.sin(angle) * (600 + dist);
+                
+                const tree = new THREE.Group();
+                const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 1.0, 7), new THREE.MeshPhongMaterial({color: 0x3e2723}));
+                const foliage = new THREE.Mesh(new THREE.DodecahedronGeometry(4), new THREE.MeshPhongMaterial({color: 0x1a4314}));
+                foliage.position.y = 7;
+                tree.add(trunk); tree.add(foliage);
+                tree.position.set(tx, 3.5, tz);
+                scene.add(tree);
+            }
+        }
+
+        function startCountdownSequence() {
+            clearTimeout(idleTimeout);
+            screenActive = 'none';
+            document.getElementById('start-screen').style.display = 'none';
+            document.getElementById('finish-screen').style.display = 'none';
+            document.getElementById('settings-screen').style.display = 'none';
+            document.getElementById('demo-screen').style.display = 'none';
+            document.getElementById('ui-layer').style.display = 'flex';
+            
+            stopFinishBGM();
+            updateControllerStatus();
+            
+            const startPoint = roadPoints[0];
+            const startTangent = curve.getTangentAt(0);
+            const startAngle = Math.atan2(startTangent.x, startTangent.z);
+            const startSide = new THREE.Vector3().crossVectors(startTangent, new THREE.Vector3(0, 1, 0)).normalize();
+            
+            playerCar.position.copy(startPoint).add(startSide.clone().multiplyScalar(6.5)).add(new THREE.Vector3(0, 0.1, 0));
+            playerCar.rotation.y = startAngle;
+
+            rivalCar.position.copy(startPoint).add(startSide.clone().multiplyScalar(-6.5)).add(new THREE.Vector3(0, 0.1, 0));
+            rivalCar.rotation.y = startAngle;
+
+            rotation = startAngle;
+            speed = 0;
+            playerProgress = 0;
+            playerTotalProgress = 0;
+            rivalTotalProgress = 0;
+            rivalSpeed = 0;
+            rivalTargetSpeed = 220 * config.rivalDifficulty;
+            rivalCurrentLaneOffset = RIVAL_LANE_OFFSET;
+            rivalTargetLane = RIVAL_LANE_OFFSET;
+            timeLeft = config.duration;
+            gameActive = false;
+            countdownActive = true;
+
+            lastCheckpointLap = 0;
+            lastCollisionTime = 0;
+            shakeAmount = 0;
+
+            const countdownEl = document.getElementById('countdown-layer');
+            const countdownText = document.getElementById('countdown-text');
+            countdownEl.style.display = 'flex';
+            
+            let count = 3;
+            countdownText.innerText = count;
+            playSound(440, 0.1, 'sine', 0.1);
+
+            const timer = setInterval(() => {
+                count--;
+                if (count > 0) {
+                    countdownText.innerText = count;
+                    playSound(440, 0.1, 'sine', 0.1);
+                } else if (count === 0) {
+                    countdownText.innerText = "GO!";
+                    countdownText.style.color = "#00ffcc";
+                    countdownText.style.textShadow = "0 0 30px #00ffcc";
+                    playSound(880, 0.3, 'sine', 0.2);
+                    
+                    gameActive = true;
+                    countdownActive = false;
+                    playBGM();
+                } else {
+                    clearInterval(timer);
+                    countdownEl.style.display = 'none';
+                }
+            }, 1000);
+        }
+
+        function getCarRotationAtProgress(progress) {
+            const t = progress % 1;
+            const tangent = curve.getTangentAt(t);
+            return Math.atan2(tangent.x, tangent.z);
+        }
+
+        function handleCarCollision(delta) {
+            const now = performance.now() / 1000;
+            if (countdownActive || clock.getElapsedTime() < 1.0) return false;
+            if (now - lastCollisionTime < COLLISION_COOLDOWN) return false;
+
+            const dx = playerCar.position.x - rivalCar.position.x;
+            const dz = playerCar.position.z - rivalCar.position.z;
+            const distance = Math.hypot(dx, dz);
+
+            if (distance < CAR_COLLISION_RADIUS * 2) {
+                lastCollisionTime = now;
+                
+                if (!demoActive) {
+                    playCollisionSound();
+                    shakeAmount = Math.min(1.2, shakeAmount + 0.9);
+                }
+
+                const pushDir = new THREE.Vector3(dx, 0, dz).normalize();
+                
+                if (gameActive) {
+                    const playerPushForce = Math.max(0.4, speed / 180) * 1.6;
+                    playerCar.position.sub(pushDir.clone().multiplyScalar(playerPushForce));
+                    rivalCar.position.add(pushDir.clone().multiplyScalar(-0.9));
+                    speed *= 0.62;
+                    if (speed < 35) speed = 35;
+                    rivalSpeed *= 0.7;
+                    rivalTargetSpeed *= 0.85;
+                } else if (demoActive) {
+                    playerCar.position.add(pushDir.clone().multiplyScalar(1.0));
+                    rivalCar.position.add(pushDir.clone().multiplyScalar(-1.0));
+                    demoPlayerSpeed *= 0.5;
+                    demoRivalSpeed *= 0.5;
+                }
+
+                return true;
+            }
+            return false;
+        }
+
+        function updatePhysics(delta) {
+            if (engineGain) {
+                const currentVolume = demoActive ? 0.08 : ((gameActive || countdownActive) ? 0.05 + (speed / 210) * 0.15 : 0);
+                engineGain.gain.setTargetAtTime(currentVolume, audioCtx.currentTime, 0.1);
+            }
+
+            if (demoActive) {
+                updateDemo(delta);
+                return;
+            }
+
+            if (!gameActive && !countdownActive) return;
+
+            if (gameActive) {
+                timeLeft -= delta;
+                if (timeLeft <= 0) {
+                    timeLeft = 0;
+                    finishGame();
+                    return;
+                }
+            }
+
+            if (countdownActive) {
+                speed = 0;
+                rivalSpeed = 0;
+                playerCar.position.y = 0.1;
+                rivalCar.position.y = 0.1;
+                return;
+            }
+
+            let accel = 0;
+            if (keys.w || keys.ArrowUp) accel = 140;
+            else if (keys.s || keys.ArrowDown) accel = -70;
+            else accel = -18;
+
+            speed += accel * delta;
+            speed *= 0.988;
+            if (speed < 0.3) speed = 0;
+            if (speed > 220) speed = 220;
+
+            if (gameActive && speed > 10) {
+                const speedSensitivity = Math.min(1.0, speed / 110);
+                if (keys.a || keys.ArrowLeft) rotation += 1.7 * delta * speedSensitivity;
+                if (keys.d || keys.ArrowRight) rotation -= 1.7 * delta * speedSensitivity;
+            }
+
+            const nextX = playerCar.position.x + Math.sin(rotation) * speed * delta;
+            const nextZ = playerCar.position.z + Math.cos(rotation) * speed * delta;
+            const nextPos = new THREE.Vector3(nextX, playerCar.position.y, nextZ);
+
+            const currentIdx = Math.floor(playerProgress * roadPoints.length);
+            let minDist = Infinity;
+            let bestIdx = 0;
+            for(let i = currentIdx - 50; i < currentIdx + 50; i++) {
+                const idx = (i + roadPoints.length) % roadPoints.length;
+                const d = nextPos.distanceTo(roadPoints[idx]);
+                if (d < minDist) { minDist = d; bestIdx = idx; }
+            }
+
+            if (minDist > (TRACK_WIDTH / 2 - 2.4)) {
+                speed *= 0.84;
+                const pushBack = new THREE.Vector3().subVectors(roadPoints[bestIdx], nextPos).normalize();
+                playerCar.position.add(pushBack.multiplyScalar(0.6));
+            } else {
+                playerCar.position.copy(nextPos);
+            }
+            playerCar.rotation.y = rotation;
+
+            const newProgress = bestIdx / roadPoints.length;
+            if (playerProgress > 0.8 && newProgress < 0.2) playerTotalProgress += 1.0;
+            else if (playerProgress < 0.2 && newProgress > 0.8) playerTotalProgress -= 1.0;
+            playerProgress = newProgress;
+
+            const currentLap = Math.floor(playerTotalProgress + playerProgress);
+            if (currentLap > lastCheckpointLap) {
+                lastCheckpointLap = currentLap;
+                playCheckpointSound();
+                const announce = document.getElementById('checkpoint-announce');
+                announce.classList.remove('hidden');
+                if (checkpointAnnounceTimer) clearTimeout(checkpointAnnounceTimer);
+                checkpointAnnounceTimer = setTimeout(() => announce.classList.add('hidden'), 2200);
+            }
+
+            const playerOverall = playerTotalProgress + playerProgress;
+            const progressDiff = rivalTotalProgress - playerOverall;
+            rivalTargetSpeed = 220 * config.rivalDifficulty;
+            if (progressDiff < -0.05) rivalTargetSpeed *= 1.25 + Math.random() * 0.08;
+            else if (progressDiff > 0.08) rivalTargetSpeed *= 0.92 - config.rivalDifficulty * 0.08;
+
+            rivalSpeed += (rivalTargetSpeed - rivalSpeed) * 0.7 * delta;
+            rivalTotalProgress += (rivalSpeed / 4800) * delta;
+
+            const distanceToPlayer = playerCar.position.distanceTo(rivalCar.position);
+            if (distanceToPlayer < 22) {
+                const baseP = curve.getPointAt(rivalTotalProgress % 1);
+                const tangentP = curve.getTangentAt(rivalTotalProgress % 1);
+                const sideP = new THREE.Vector3().crossVectors(tangentP, new THREE.Vector3(0,1,0)).normalize();
+                const dot = new THREE.Vector3().subVectors(playerCar.position, baseP).dot(sideP);
+                rivalTargetLane = dot > 0 ? -Math.abs(RIVAL_LANE_OFFSET) : Math.abs(RIVAL_LANE_OFFSET);
+            } else {
+                rivalTargetLane = RIVAL_LANE_OFFSET;
+            }
+
+            rivalCurrentLaneOffset += (rivalTargetLane - rivalCurrentLaneOffset) * 0.12;
+            const rivalT = rivalTotalProgress % 1;
+            const rBasePos = curve.getPointAt(rivalT);
+            const rTangent = curve.getTangentAt(rivalT);
+            const rSide = new THREE.Vector3().crossVectors(rTangent, new THREE.Vector3(0,1,0)).normalize();
+            const sway = Math.sin(clock.getElapsedTime() * 2.5 + rivalTotalProgress * 40) * 1.2;
+            rivalCar.position.copy(rBasePos).add(rSide.clone().multiplyScalar(rivalCurrentLaneOffset + sway)).add(new THREE.Vector3(0, 0.1, 0));
+            rivalCar.rotation.y = getCarRotationAtProgress(rivalT) + (sway * 0.01);
+
+            handleCarCollision(delta);
+
+            if (shakeAmount > 0.02) {
+                camera.position.x += (Math.random() - 0.5) * shakeAmount * 2.2;
+                camera.position.y += (Math.random() - 0.5) * shakeAmount * 1.1 + 0.3;
+                shakeAmount *= 0.84;
+            }
+
+            document.getElementById('speed-display').innerText = Math.round(speed);
+            const timerEl = document.getElementById('timer');
+            timerEl.innerText = timeLeft.toFixed(2);
+            timerEl.className = timeLeft < 10 ? "text-4xl font-black italic time-warning" : "text-4xl font-black italic";
+            document.getElementById('lap-display').innerText = `LAP ${Math.floor(playerOverall) + 1}`;
+            document.getElementById('rank').innerText = (playerOverall > rivalTotalProgress) ? "1st / 2" : "2nd / 2";
+        }
+
+        function updateDemo(delta) {
+            const time = clock.getElapsedTime();
+            let pTarget = 110 + Math.sin(time * 0.4) * 45;
+            let rTarget = 110 + Math.sin(time * 0.4 + Math.PI) * 45;
+
+            if (demoPlayerProgress < demoRivalProgress) pTarget += 15;
+            else rTarget += 15;
+
+            demoPlayerSpeed += (pTarget - demoPlayerSpeed) * delta;
+            demoRivalSpeed += (rTarget - demoRivalSpeed) * delta;
+            demoPlayerProgress = (demoPlayerProgress + demoPlayerSpeed * delta * 0.001) % 1.0;
+            demoRivalProgress = (demoRivalProgress + demoRivalSpeed * delta * 0.001) % 1.0;
+
+            const dist = Math.abs(demoPlayerProgress - demoRivalProgress);
+            if (dist < 0.05) {
+                demoPlayerLane += (7 - demoPlayerLane) * delta * 2;
+                demoRivalLane += (-7 - demoRivalLane) * delta * 2;
+            } else {
+                demoPlayerLane += (Math.sin(time) * 4 - demoPlayerLane) * delta;
+                demoRivalLane += (Math.sin(time + 2) * 4 - demoRivalLane) * delta;
+            }
+
+            const pT = demoPlayerProgress;
+            const pBase = curve.getPointAt(pT);
+            const pSide = new THREE.Vector3().crossVectors(curve.getTangentAt(pT), new THREE.Vector3(0,1,0)).normalize();
+            playerCar.position.copy(pBase).add(pSide.multiplyScalar(demoPlayerLane)).add(new THREE.Vector3(0, 0.1, 0));
+            playerCar.rotation.y = getCarRotationAtProgress(pT);
+
+            const rT = demoRivalProgress;
+            const rBase = curve.getPointAt(rT);
+            const rSide = new THREE.Vector3().crossVectors(curve.getTangentAt(rT), new THREE.Vector3(0,1,0)).normalize();
+            rivalCar.position.copy(rBase).add(rSide.multiplyScalar(demoRivalLane)).add(new THREE.Vector3(0, 0.1, 0));
+            rivalCar.rotation.y = getCarRotationAtProgress(rT);
+
+            handleCarCollision(delta);
+        }
+
+        function updateCamera() {
+            let camDist = demoActive ? 30 : 26;
+            let camHeight = demoActive ? 14 : 11;
+            if (shakeAmount > 0.5) {
+                camDist += shakeAmount * 14;
+                camHeight += shakeAmount * 6;
+            }
+            const targetPos = new THREE.Vector3(
+                playerCar.position.x - Math.sin(playerCar.rotation.y) * camDist,
+                playerCar.position.y + camHeight,
+                playerCar.position.z - Math.cos(playerCar.rotation.y) * camDist
+            );
+            camera.position.lerp(targetPos, 0.1);
+            camera.lookAt(
+                playerCar.position.x + Math.sin(playerCar.rotation.y) * 20,
+                playerCar.position.y + 1.6,
+                playerCar.position.z + Math.cos(playerCar.rotation.y) * 20
+            );
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+            updateGamepadInput();
+            updateControllerStatus();
+            updatePhysics(delta);
+            updateCamera();
+            renderer.render(scene, camera);
+        }
+
+        function finishGame() {
+            gameActive = false;
+            stopBGM();
+            screenActive = 'finish';
+            menuIndex = 0;
+            document.getElementById('finish-screen').style.display = 'flex';
+            document.getElementById('ui-layer').style.display = 'none';
+            updateControllerStatus();
+            const totalP = playerTotalProgress + playerProgress;
+            document.getElementById('final-laps').innerText = `SCORE: ${totalP.toFixed(2)} LAPS`;
+            document.getElementById('final-rank').innerText = (totalP > rivalTotalProgress) ? "POSITION: 1st" : "POSITION: 2nd";
+            updateMenuSelection(document.querySelectorAll('#finish-menu .menu-item'));
+            resetIdleTimer();
+            playFinishBGM();
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        window.onload = init;
+    </script>
+</body>
+</html>
