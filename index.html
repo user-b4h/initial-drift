@@ -130,16 +130,6 @@
             font-style: italic;
         }
 
-        .scanline {
-            width: 100%;
-            height: 100%;
-            z-index: 200;
-            background: linear-gradient(0deg, rgba(0,0,0,0) 50%, rgba(255,255,255,0.02) 50%);
-            background-size: 100% 4px;
-            position: absolute;
-            pointer-events: none;
-        }
-
         .time-warning {
             color: #ff3c00;
             animation: blink 0.5s infinite;
@@ -179,8 +169,6 @@
     </style>
 </head>
 <body>
-
-    <div class="scanline"></div>
 
     <div id="controller-status" style="display: none;">
         CONTROLLER: NONE
@@ -497,7 +485,6 @@
             bgmAudio.addEventListener('ended', onBgmEnded);
 
             bgmAudio.play().catch(e => {
-                console.log('BGM autoplay prevented:', e);
             });
         }
 
@@ -511,7 +498,6 @@
             finishBgmAudio.loop = true;
             finishBgmAudio.volume = 0.15;
             finishBgmAudio.play().catch(e => {
-                console.log('Finish BGM autoplay prevented:', e);
             });
         }
 
@@ -595,13 +581,11 @@
         }
 
         window.addEventListener('gamepadconnected', (e) => {
-            console.log("Gamepad connected:", e.gamepad.index);
             gamepads[e.gamepad.index] = e.gamepad;
             updateControllerStatus();
         });
 
         window.addEventListener('gamepaddisconnected', (e) => {
-            console.log("Gamepad disconnected:", e.gamepad.index);
             delete gamepads[e.gamepad.index];
             updateControllerStatus();
         });
